@@ -1,6 +1,6 @@
-# 狸工
+# 一日有痕
 
-狸工 is a small local-first daily todo and reflection tool.
+一日有痕 is a small local-first daily todo and reflection tool.
 
 The app is a single static HTML file. It runs in the browser, stores data locally, and is designed for daily personal tracking:
 

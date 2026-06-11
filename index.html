@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>狸工</title>
+  <title>一日有痕</title>
   <style>
     :root {
       color-scheme: light;
@@ -79,9 +79,8 @@
     }
 
     .brand {
-      display: flex;
-      align-items: center;
-      gap: 12px;
+      display: grid;
+      gap: 6px;
     }
 
     .brand h1 {
@@ -92,47 +91,10 @@
       letter-spacing: 0;
     }
 
-    .brand-copy {
-      display: grid;
-      gap: 6px;
-    }
-
     .brand p {
       margin: 0;
       color: var(--muted);
       font-size: 15px;
-    }
-
-    .logo-mark {
-      width: clamp(52px, 7vw, 72px);
-      height: clamp(52px, 7vw, 72px);
-      flex: 0 0 auto;
-      filter: drop-shadow(0 10px 18px rgba(27, 31, 38, .12));
-    }
-
-    .logo-mark .face {
-      fill: #b7654d;
-    }
-
-    .logo-mark .mask {
-      fill: #fff3df;
-    }
-
-    .logo-mark .ear,
-    .logo-mark .stripe {
-      fill: #2f3338;
-    }
-
-    .logo-mark .leaf {
-      fill: var(--green);
-    }
-
-    .logo-mark .line {
-      fill: none;
-      stroke: #2f3338;
-      stroke-width: 4;
-      stroke-linecap: round;
-      stroke-linejoin: round;
     }
 
     .date-switcher {
@@ -960,10 +922,6 @@
         padding: 14px;
       }
 
-      .brand {
-        gap: 10px;
-      }
-
       .year-grid {
         gap: 5px;
       }
@@ -1007,25 +965,8 @@
   <main class="app">
     <header class="topbar">
       <div class="brand">
-        <svg class="logo-mark" viewBox="0 0 96 96" role="img" aria-labelledby="logoTitle logoDesc">
-          <title id="logoTitle">狸工 logo</title>
-          <desc id="logoDesc">一只勤快的小狸猫，手里拿着叶子形状的清单。</desc>
-          <path class="ear" d="M20 25 12 8 32 17Z"></path>
-          <path class="ear" d="M76 25 84 8 64 17Z"></path>
-          <circle class="face" cx="48" cy="47" r="34"></circle>
-          <path class="mask" d="M20 42c7-15 20-18 28-6 8-12 21-9 28 6-3 17-14 29-28 29S23 59 20 42Z"></path>
-          <path class="stripe" d="M27 35c8-8 18-8 24 1-9 1-16 6-21 14-3-4-4-9-3-15Z"></path>
-          <path class="stripe" d="M69 35c-8-8-18-8-24 1 9 1 16 6 21 14 3-4 4-9 3-15Z"></path>
-          <circle cx="36" cy="47" r="3.5" fill="#17191f"></circle>
-          <circle cx="60" cy="47" r="3.5" fill="#17191f"></circle>
-          <path class="line" d="M43 57c2 2 8 2 10 0"></path>
-          <path class="leaf" d="M58 70c13-2 21 3 24 14-13 2-21-3-24-14Z"></path>
-          <path class="line" d="M62 74 78 83"></path>
-        </svg>
-        <div class="brand-copy">
-          <h1>狸工</h1>
-          <p>把今天拆小一点，完成后留下记录。</p>
-        </div>
+        <h1>一日有痕</h1>
+        <p>把今天拆小一点，完成后留下记录。</p>
       </div>
     </header>
 
