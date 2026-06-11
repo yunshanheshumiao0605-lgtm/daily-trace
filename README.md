@@ -9,7 +9,7 @@ The app is a single static HTML file. It runs in the browser, stores data locall
 - habit check-ins
 - monthly habit overview
 - lightweight daily review
-- local Obsidian/Markdown export workflow
+- local Obsidian/Markdown auto-sync workflow
 
 ## Use It Locally
 
@@ -29,7 +29,7 @@ For stable long-term use, choose one access method and keep using it. Browser lo
 
 ## Data
 
-Daily Todo stores app data in your browser's local storage. Use the built-in sync/export flow if you want durable notes outside the browser.
+Daily Todo stores app data in your browser's local storage. Use the built-in Obsidian sync flow if you want durable Markdown notes outside the browser. After the first folder authorization, edits can be automatically synced to daily Markdown files.
 
 ## GitHub Pages
 

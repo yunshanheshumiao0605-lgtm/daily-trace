@@ -1047,8 +1047,8 @@
             <p class="review-intro">按 AAR 轻量复盘：对照计划和实际，找出偏差原因，再给明天一个小实验。</p>
           </div>
           <div class="review-actions">
-            <button class="sync-btn" id="syncObsidian" type="button">同步到 Obsidian</button>
-            <span class="sync-status" id="syncStatus">首次同步需选择 Vault</span>
+            <button class="sync-btn" id="syncObsidian" type="button">开启 Obsidian 自动同步</button>
+            <span class="sync-status" id="syncStatus">首次点击后选择 Vault</span>
           </div>
         </div>
         <div class="fields">
@@ -1235,6 +1235,10 @@
     let currentDate = toDateKey(new Date());
     let store = loadStore();
     let obsidianDirHandle = null;
+    let obsidianAutoSync = localStorage.getItem("daily-todo-obsidian-auto-sync-v1") === "enabled";
+    let obsidianSyncTimer = null;
+    let obsidianSyncInFlight = false;
+    let obsidianSyncPending = false;
 
     function toDateKey(date) {
       const year = date.getFullYear();
@@ -1330,6 +1334,7 @@
       renderQuote();
       renderHistory();
       renderHabitMonth();
+      updateObsidianSyncUi();
     }
 
     function renderDateLabel() {
@@ -1448,6 +1453,7 @@
           renderProgress(getDay());
           renderHistory();
           if (section === "habit") renderHabitMonth();
+          scheduleObsidianSync();
         });
 
         const remove = document.createElement("button");
@@ -1476,6 +1482,7 @@
           detail.addEventListener("input", () => {
             task.detail = detail.value;
             saveStore();
+            scheduleObsidianSync();
           });
 
           const editor = document.createElement("details");
@@ -1515,6 +1522,7 @@
       matched.done = !matched.done;
       saveStore();
       render();
+      scheduleObsidianSync(dateKey);
     }
 
     function renderHabitMonth() {
@@ -1680,6 +1688,7 @@
     function persistAndRender() {
       saveStore();
       render();
+      scheduleObsidianSync();
     }
 
     function markdownList(title, tasks) {
@@ -1697,18 +1706,18 @@
       return lines.join("\n");
     }
 
-    function buildReviewMarkdown() {
-      const day = getDay();
-      const date = fromDateKey(currentDate);
+    function buildReviewMarkdown(dateKey = currentDate) {
+      const day = getDay(dateKey);
+      const date = fromDateKey(dateKey);
       const weekday = new Intl.DateTimeFormat("zh-CN", { weekday: "long" }).format(date);
       const tasks = sections.flatMap(section => day[section] || []);
       const done = tasks.filter(task => task.done).length;
       const total = tasks.length;
 
       return [
-        `# 每日复盘 ${currentDate}`,
+        `# 每日复盘 ${dateKey}`,
         "",
-        `- 日期：${currentDate} ${weekday}`,
+        `- 日期：${dateKey} ${weekday}`,
         `- 完成进度：${done} / ${total}`,
         "",
         markdownList("必须完成", day.must || []),
@@ -1790,9 +1799,35 @@
       }
     }
 
-    async function syncToObsidian() {
-      const filename = `${currentDate}.md`;
-      const content = buildReviewMarkdown();
+    function updateObsidianSyncUi() {
+      if (obsidianAutoSync) {
+        syncObsidian.textContent = obsidianDirHandle ? "Obsidian 自动同步已开启" : "重新授权 Obsidian 自动同步";
+        if (!syncStatus.textContent || syncStatus.textContent === "首次点击后选择 Vault") {
+          syncStatus.textContent = obsidianDirHandle ? "修改后会自动同步" : "刷新后需重新选择文件夹";
+        }
+      } else {
+        syncObsidian.textContent = "开启 Obsidian 自动同步";
+        syncStatus.textContent = "首次点击后选择 Vault";
+      }
+    }
+
+    function scheduleObsidianSync(dateKey = currentDate) {
+      if (!obsidianAutoSync || !obsidianDirHandle) return;
+      clearTimeout(obsidianSyncTimer);
+      obsidianSyncTimer = setTimeout(() => {
+        syncToObsidian({ automatic: true, dateKey });
+      }, 900);
+    }
+
+    async function syncToObsidian(options = { automatic: false, dateKey: currentDate }) {
+      if (obsidianSyncInFlight) {
+        obsidianSyncPending = true;
+        return;
+      }
+
+      const dateKey = options.dateKey || currentDate;
+      const filename = `${dateKey}.md`;
+      const content = buildReviewMarkdown(dateKey);
 
       if (!window.showDirectoryPicker) {
         downloadMarkdown(filename, content);
@@ -1800,19 +1835,31 @@
         return;
       }
 
+      obsidianSyncInFlight = true;
+      syncStatus.textContent = options.automatic ? "正在自动同步..." : "正在同步...";
+
       try {
         const dirHandle = await getObsidianReviewDir({ create: true });
         const fileHandle = await dirHandle.getFileHandle(filename, { create: true });
         const writable = await fileHandle.createWritable();
         await writable.write(content);
         await writable.close();
+        obsidianAutoSync = true;
+        localStorage.setItem("daily-todo-obsidian-auto-sync-v1", "enabled");
         syncStatus.textContent = `已同步：每日复盘/${filename}`;
+        updateObsidianSyncUi();
       } catch (error) {
         if (error.name === "AbortError") {
           syncStatus.textContent = "已取消选择文件夹";
         } else {
-          downloadMarkdown(filename, content);
-          syncStatus.textContent = "写入失败，已下载 Markdown";
+          if (!options.automatic) downloadMarkdown(filename, content);
+          syncStatus.textContent = options.automatic ? "自动同步失败，请重新授权" : "写入失败，已下载 Markdown";
+        }
+      } finally {
+        obsidianSyncInFlight = false;
+        if (obsidianSyncPending) {
+          obsidianSyncPending = false;
+          scheduleObsidianSync();
         }
       }
     }
@@ -1836,6 +1883,7 @@
         getDay()[id] = event.target.value;
         saveStore();
         renderHistory();
+        scheduleObsidianSync();
       });
     });
 
