@@ -10,6 +10,7 @@ The app is a single static HTML file. It runs in the browser, stores data locall
 - monthly habit overview
 - lightweight daily review
 - local Obsidian/Markdown auto-sync workflow
+- optional daily quote refresh from a local Obsidian Markdown note
 
 ## Use It Locally
 
@@ -30,6 +31,8 @@ For stable long-term use, choose one access method and keep using it. Browser lo
 ## Data
 
 Daily Todo stores app data in your browser's local storage. Use the built-in Obsidian sync flow if you want durable Markdown notes outside the browser. After the first folder authorization, edits can be automatically synced to daily Markdown files.
+
+The daily quote can be refreshed from a private Obsidian Markdown note, such as `改变你想法的101篇文章.md`. The selected note is read only in your local browser. The app stores an extracted quote pool locally and, when browser permission is still available, refreshes it again when the page opens. Private note contents are not included in the public GitHub version.
 
 ## GitHub Pages
 

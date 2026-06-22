@@ -301,6 +301,34 @@
       text-indent: 2em;
     }
 
+    .quote-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-top: -4px;
+    }
+
+    .quote-sync-btn {
+      min-height: 30px;
+      padding: 0 10px;
+      border-radius: 6px;
+      background: #eef3f6;
+      color: var(--blue);
+      font-size: 12px;
+      font-weight: 760;
+    }
+
+    .quote-sync-btn:hover {
+      background: #e4edf3;
+    }
+
+    .quote-status {
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.35;
+    }
+
     .section-title,
     .field label {
       font-size: 14px;
@@ -986,6 +1014,10 @@
       <div class="day-stack">
         <article class="reflection-panel" aria-label="每日精选">
           <blockquote class="daily-quote" id="quoteText">今天先做一件小而确定的事。</blockquote>
+          <div class="quote-actions">
+            <button class="quote-sync-btn" id="syncQuotes" type="button">从 Obsidian 更新每日一句</button>
+            <span class="quote-status" id="quoteStatus"></span>
+          </div>
           <h2 class="habit-report-title">本月打卡</h2>
           <div class="month-panel" id="habitMonthPanel"></div>
         </article>
@@ -1113,6 +1145,8 @@
       habit: document.getElementById("habitCount")
     };
     const quoteText = document.getElementById("quoteText");
+    const syncQuotes = document.getElementById("syncQuotes");
+    const quoteStatus = document.getElementById("quoteStatus");
     const syncObsidian = document.getElementById("syncObsidian");
     const syncStatus = document.getElementById("syncStatus");
     const obsidianPreview = document.getElementById("obsidianPreview");
@@ -1239,6 +1273,8 @@
     let obsidianSyncTimer = null;
     let obsidianSyncInFlight = false;
     let obsidianSyncPending = false;
+    let customQuotePool = loadQuotePool();
+    let quoteFileHandle = null;
 
     function toDateKey(date) {
       const year = date.getFullYear();
@@ -1257,6 +1293,72 @@
         return JSON.parse(localStorage.getItem("daily-todo-store-v1")) || {};
       } catch {
         return {};
+      }
+    }
+
+    function loadQuotePool() {
+      try {
+        return JSON.parse(localStorage.getItem("daily-trace-quote-pool-v1")) || null;
+      } catch {
+        return null;
+      }
+    }
+
+    function saveQuotePool(quotes, sourceName) {
+      customQuotePool = {
+        quotes,
+        sourceName,
+        updatedAt: new Date().toISOString()
+      };
+      localStorage.setItem("daily-trace-quote-pool-v1", JSON.stringify(customQuotePool));
+    }
+
+    function openQuoteDb() {
+      return new Promise((resolve, reject) => {
+        if (!window.indexedDB) {
+          reject(new Error("IndexedDB unavailable"));
+          return;
+        }
+
+        const request = indexedDB.open("daily-trace-settings-v1", 1);
+        request.onupgradeneeded = () => {
+          request.result.createObjectStore("handles");
+        };
+        request.onsuccess = () => resolve(request.result);
+        request.onerror = () => reject(request.error);
+      });
+    }
+
+    async function getSavedQuoteFileHandle() {
+      if (quoteFileHandle) return quoteFileHandle;
+
+      try {
+        const db = await openQuoteDb();
+        quoteFileHandle = await new Promise((resolve, reject) => {
+          const request = db.transaction("handles").objectStore("handles").get("quoteSource");
+          request.onsuccess = () => resolve(request.result || null);
+          request.onerror = () => reject(request.error);
+        });
+        db.close();
+        return quoteFileHandle;
+      } catch {
+        return null;
+      }
+    }
+
+    async function saveQuoteFileHandle(fileHandle) {
+      quoteFileHandle = fileHandle;
+
+      try {
+        const db = await openQuoteDb();
+        await new Promise((resolve, reject) => {
+          const request = db.transaction("handles", "readwrite").objectStore("handles").put(fileHandle, "quoteSource");
+          request.onsuccess = () => resolve();
+          request.onerror = () => reject(request.error);
+        });
+        db.close();
+      } catch {
+        // The imported quote pool still works even if the browser cannot remember the file handle.
       }
     }
 
@@ -1335,6 +1437,7 @@
       renderHistory();
       renderHabitMonth();
       updateObsidianSyncUi();
+      updateQuoteSyncUi();
     }
 
     function renderDateLabel() {
@@ -1353,8 +1456,120 @@
       const date = fromDateKey(currentDate);
       const start = new Date(date.getFullYear(), 0, 0);
       const dayOfYear = Math.floor((date - start) / 86400000);
-      const selection = dailySelections[(dayOfYear - 1) % dailySelections.length];
+      const quotes = customQuotePool?.quotes?.length ? customQuotePool.quotes : dailySelections;
+      const selection = quotes[(dayOfYear - 1) % quotes.length];
       quoteText.textContent = selection;
+    }
+
+    function updateQuoteSyncUi() {
+      if (!customQuotePool?.quotes?.length) {
+        quoteStatus.textContent = "使用内置句子库";
+        return;
+      }
+
+      const updatedAt = new Date(customQuotePool.updatedAt);
+      const dateLabel = Number.isNaN(updatedAt.getTime())
+        ? ""
+        : new Intl.DateTimeFormat("zh-CN", {
+          month: "numeric",
+          day: "numeric",
+          hour: "2-digit",
+          minute: "2-digit"
+        }).format(updatedAt);
+      quoteStatus.textContent = `已载入 ${customQuotePool.quotes.length} 句${dateLabel ? ` · ${dateLabel}` : ""}`;
+    }
+
+    function cleanQuoteLine(line) {
+      return line
+        .replace(/^#{1,6}\s*/, "")
+        .replace(/^[-*+]\s+/, "")
+        .replace(/^\d+[.)、]\s*/, "")
+        .replace(/^>\s*/, "")
+        .replace(/\[\[|\]\]/g, "")
+        .replace(/\*\*|__/g, "")
+        .trim();
+    }
+
+    function extractQuotesFromMarkdown(markdown) {
+      return markdown
+        .split(/\n{1,}/)
+        .map(cleanQuoteLine)
+        .filter(line => line.length >= 18)
+        .filter(line => !/^---+$/.test(line))
+        .filter(line => !/^!\[/.test(line))
+        .filter(line => !/^https?:\/\//.test(line))
+        .slice(0, 365);
+    }
+
+    async function importQuotesFromFileHandle(fileHandle, options = { requestPermission: true }) {
+      if (options.requestPermission && fileHandle.queryPermission && fileHandle.requestPermission) {
+        let permission = await fileHandle.queryPermission({ mode: "read" });
+        if (permission !== "granted") {
+          permission = await fileHandle.requestPermission({ mode: "read" });
+        }
+        if (permission !== "granted") {
+          quoteStatus.textContent = "需要重新授权后才能读取最新句子";
+          return false;
+        }
+      }
+
+      const file = await fileHandle.getFile();
+      const markdown = await file.text();
+      const quotes = extractQuotesFromMarkdown(markdown);
+
+      if (!quotes.length) {
+        quoteStatus.textContent = "没有提取到可用句子";
+        return false;
+      }
+
+      saveQuotePool(quotes, file.name);
+      await saveQuoteFileHandle(fileHandle);
+      renderQuote();
+      updateQuoteSyncUi();
+      return true;
+    }
+
+    async function autoRefreshQuotesFromObsidian() {
+      const fileHandle = await getSavedQuoteFileHandle();
+      if (!fileHandle) return;
+
+      try {
+        const permission = fileHandle.queryPermission
+          ? await fileHandle.queryPermission({ mode: "read" })
+          : "granted";
+        if (permission !== "granted") {
+          quoteStatus.textContent = "句子来源已记住，点击按钮重新授权更新";
+          return;
+        }
+        await importQuotesFromFileHandle(fileHandle, { requestPermission: false });
+      } catch {
+        quoteStatus.textContent = "自动更新失败，点击按钮重新选择";
+      }
+    }
+
+    async function syncQuotesFromObsidian() {
+      if (!window.showOpenFilePicker) {
+        quoteStatus.textContent = "当前浏览器不支持读取本地 Markdown";
+        return;
+      }
+
+      try {
+        quoteStatus.textContent = "请选择《改变你想法的101篇文章》Markdown 文件";
+        const [fileHandle] = await window.showOpenFilePicker({
+          id: "daily-trace-quotes",
+          multiple: false,
+          types: [{
+            description: "Markdown",
+            accept: {
+              "text/markdown": [".md", ".markdown"],
+              "text/plain": [".txt"]
+            }
+          }]
+        });
+        await importQuotesFromFileHandle(fileHandle);
+      } catch (error) {
+        quoteStatus.textContent = error.name === "AbortError" ? "已取消更新" : "读取失败，请重新选择";
+      }
     }
 
     function taskCompletionFor(key) {
@@ -1888,6 +2103,7 @@
     });
 
     syncObsidian.addEventListener("click", syncToObsidian);
+    syncQuotes.addEventListener("click", syncQuotesFromObsidian);
 
     dateInput.addEventListener("change", event => {
       currentDate = event.target.value || toDateKey(new Date());
@@ -1914,6 +2130,7 @@
     });
 
     render();
+    autoRefreshQuotesFromObsidian();
   </script>
 </body>
 </html>
