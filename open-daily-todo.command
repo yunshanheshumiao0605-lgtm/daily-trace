@@ -1,7 +1,7 @@
 #!/bin/zsh
 set -e
 
-APP_DIR="$(cd "$(dirname "$0")" && pwd)"
+APP_DIR="/Users/sutingting/Documents/Codex/2026-06-08/to-do-list"
 URL="http://127.0.0.1:8765/index.html"
 LOG_FILE="/tmp/daily-trace-server.log"
 
