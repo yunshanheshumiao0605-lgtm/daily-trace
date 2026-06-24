@@ -428,7 +428,7 @@
 
     .task {
       display: grid;
-      grid-template-columns: 38px 1fr 30px;
+      grid-template-columns: minmax(0, 1fr) 30px;
       gap: 8px;
       align-items: center;
       min-height: 46px;
@@ -436,6 +436,7 @@
     }
 
     .task.habit-task {
+      grid-template-columns: 38px 1fr 30px;
       align-items: center;
       min-height: 54px;
       padding: 4px 0;
@@ -1686,26 +1687,30 @@
 
       tasks.forEach(task => {
         const row = document.createElement("div");
-        row.className = `task${section === "habit" ? " habit-task" : ""}${task.done ? " done" : ""}`;
+        row.className = `task${section === "habit" ? " habit-task" : ""}${section === "habit" && task.done ? " done" : ""}`;
 
-        const doneToggle = document.createElement("label");
-        doneToggle.className = "done-toggle";
-        doneToggle.title = task.done ? "标记为未完成" : "标记为已完成";
-        doneToggle.setAttribute("aria-label", task.done ? "标记为未完成" : "标记为已完成");
+        let doneToggle = null;
 
-        const checkbox = document.createElement("input");
-        checkbox.type = "checkbox";
-        checkbox.checked = task.done;
-        checkbox.addEventListener("change", () => {
-          task.done = checkbox.checked;
-          persistAndRender();
-        });
+        if (section === "habit") {
+          doneToggle = document.createElement("label");
+          doneToggle.className = "done-toggle";
+          doneToggle.title = task.done ? "标记为未完成" : "标记为已完成";
+          doneToggle.setAttribute("aria-label", task.done ? "标记为未完成" : "标记为已完成");
 
-        const doneMark = document.createElement("span");
-        doneMark.className = "done-mark";
-        doneMark.setAttribute("aria-hidden", "true");
-        doneMark.textContent = "✓";
-        doneToggle.append(checkbox, doneMark);
+          const checkbox = document.createElement("input");
+          checkbox.type = "checkbox";
+          checkbox.checked = task.done;
+          checkbox.addEventListener("change", () => {
+            task.done = checkbox.checked;
+            persistAndRender();
+          });
+
+          const doneMark = document.createElement("span");
+          doneMark.className = "done-mark";
+          doneMark.setAttribute("aria-hidden", "true");
+          doneMark.textContent = "✓";
+          doneToggle.append(checkbox, doneMark);
+        }
 
         const input = document.createElement("input");
         input.type = "text";
@@ -1759,7 +1764,7 @@
           fieldsWrap.append(titleRow);
           row.append(doneToggle, fieldsWrap, remove);
         } else {
-          row.append(doneToggle, input, remove);
+          row.append(input, remove);
         }
         host.appendChild(row);
       });
@@ -1861,9 +1866,13 @@
         const tasks = day[section] || [];
         const total = tasks.length;
         const done = tasks.filter(task => task.done).length;
-        taskCounters[section].textContent = section === "must"
-          ? `${total}/3项`
-          : total ? `${done}/${total}项` : "0项";
+        if (section === "must") {
+          taskCounters[section].textContent = `${total}/3项`;
+        } else if (section === "push") {
+          taskCounters[section].textContent = `${total}项`;
+        } else {
+          taskCounters[section].textContent = total ? `${done}/${total}项` : "0项";
+        }
       });
       document.querySelectorAll(".add-row").forEach(form => {
         const section = form.dataset.add;
