@@ -428,7 +428,7 @@
 
     .task {
       display: grid;
-      grid-template-columns: 28px 1fr 30px;
+      grid-template-columns: 38px 1fr 30px;
       gap: 8px;
       align-items: center;
       min-height: 46px;
@@ -441,11 +441,49 @@
       padding: 4px 0;
     }
 
-    .task input[type="checkbox"] {
-      width: 18px;
-      height: 18px;
-      accent-color: var(--green);
+    .done-toggle {
+      width: 34px;
+      height: 34px;
+      display: grid;
+      place-items: center;
+      border-radius: 999px;
       cursor: pointer;
+    }
+
+    .done-toggle input {
+      position: absolute;
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    .done-mark {
+      width: 24px;
+      height: 24px;
+      display: grid;
+      place-items: center;
+      border: 2px solid #8a929b;
+      border-radius: 999px;
+      color: transparent;
+      font-size: 15px;
+      font-weight: 900;
+      line-height: 1;
+      transition: background .16s ease, border-color .16s ease, color .16s ease, transform .16s ease;
+    }
+
+    .done-toggle:hover .done-mark {
+      border-color: var(--green);
+      transform: scale(1.04);
+    }
+
+    .done-toggle input:focus-visible + .done-mark {
+      outline: 3px solid rgba(72, 122, 87, .24);
+      outline-offset: 2px;
+    }
+
+    .task.done .done-mark {
+      background: var(--green);
+      border-color: var(--green);
+      color: #fff;
     }
 
     .task input[type="text"] {
@@ -1650,6 +1688,11 @@
         const row = document.createElement("div");
         row.className = `task${section === "habit" ? " habit-task" : ""}${task.done ? " done" : ""}`;
 
+        const doneToggle = document.createElement("label");
+        doneToggle.className = "done-toggle";
+        doneToggle.title = task.done ? "标记为未完成" : "标记为已完成";
+        doneToggle.setAttribute("aria-label", task.done ? "标记为未完成" : "标记为已完成");
+
         const checkbox = document.createElement("input");
         checkbox.type = "checkbox";
         checkbox.checked = task.done;
@@ -1657,6 +1700,12 @@
           task.done = checkbox.checked;
           persistAndRender();
         });
+
+        const doneMark = document.createElement("span");
+        doneMark.className = "done-mark";
+        doneMark.setAttribute("aria-hidden", "true");
+        doneMark.textContent = "✓";
+        doneToggle.append(checkbox, doneMark);
 
         const input = document.createElement("input");
         input.type = "text";
@@ -1708,9 +1757,9 @@
 
           titleRow.append(input, editor);
           fieldsWrap.append(titleRow);
-          row.append(checkbox, fieldsWrap, remove);
+          row.append(doneToggle, fieldsWrap, remove);
         } else {
-          row.append(checkbox, input, remove);
+          row.append(doneToggle, input, remove);
         }
         host.appendChild(row);
       });
