@@ -1068,7 +1068,7 @@
         <div class="task-head">
           <div>
             <h2>必须完成</h2>
-            <p>最多三件，决定今天是否过关。</p>
+            <p>建议先写三件，重要的事也可以继续补充。</p>
           </div>
           <span class="tag" id="mustCount">0项</span>
         </div>
@@ -1867,7 +1867,7 @@
         const total = tasks.length;
         const done = tasks.filter(task => task.done).length;
         if (section === "must") {
-          taskCounters[section].textContent = `${total}/3项`;
+          taskCounters[section].textContent = `${total}项`;
         } else if (section === "push") {
           taskCounters[section].textContent = `${total}项`;
         } else {
@@ -1878,10 +1878,9 @@
         const section = form.dataset.add;
         const input = form.querySelector("input");
         const button = form.querySelector("button");
-        const isFull = section === "must" && (day[section] || []).length >= 3;
-        input.disabled = isFull;
-        button.disabled = isFull;
-        input.placeholder = isFull ? "已写满 3 件" : addPlaceholders[section];
+        input.disabled = false;
+        button.disabled = false;
+        input.placeholder = addPlaceholders[section];
       });
     }
 
@@ -2142,7 +2141,6 @@
         event.preventDefault();
         const section = form.dataset.add;
         const input = form.querySelector("input");
-        if (section === "must" && (getDay()[section] || []).length >= 3) return;
         const text = input.value.trim();
         if (!text) return;
         getDay()[section].push({ id: crypto.randomUUID(), text, detail: "", done: false });
