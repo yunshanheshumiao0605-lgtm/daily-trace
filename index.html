@@ -1115,7 +1115,7 @@
         <div class="review-head">
           <div>
             <h2>每日复盘</h2>
-            <p class="review-intro">按 AAR 轻量复盘：对照计划和实际，找出偏差原因，再给明天一个小实验。</p>
+            <p class="review-intro">按 KISS 复盘：保留有效动作，改进卡点，开始一个小行动，停止一个消耗。</p>
           </div>
           <div class="review-actions">
             <button class="sync-btn" id="syncObsidian" type="button">开启 Obsidian 自动同步</button>
@@ -1124,24 +1124,20 @@
         </div>
         <div class="fields">
           <div class="field">
-            <label for="planText">原计划</label>
-            <textarea id="planText" placeholder="今天原本最想完成什么？"></textarea>
+            <label for="keepText">Keep 保持</label>
+            <textarea id="keepText" placeholder="今天哪些做法有效，值得继续保持？"></textarea>
           </div>
           <div class="field">
-            <label for="doneText">实际结果</label>
-            <textarea id="doneText" placeholder="实际完成了什么？哪些没完成？"></textarea>
+            <label for="improveText">Improve 改进</label>
+            <textarea id="improveText" placeholder="哪里不顺？明天可以怎样改得更轻一点？"></textarea>
           </div>
           <div class="field">
-            <label for="blockedText">差距原因</label>
-            <textarea id="blockedText" placeholder="最大的偏差是什么？为什么发生？"></textarea>
+            <label for="startText">Start 开始</label>
+            <textarea id="startText" placeholder="明天开始做的一个小动作是什么？"></textarea>
           </div>
           <div class="field">
-            <label for="lessonText">学到什么</label>
-            <textarea id="lessonText" placeholder="今天暴露了什么模式、情绪、习惯或判断问题？"></textarea>
-          </div>
-          <div class="field wide">
-            <label for="tomorrowText">明日实验</label>
-            <textarea id="tomorrowText" placeholder="明天只改一个动作，是什么？"></textarea>
+            <label for="stopText">Stop 停止</label>
+            <textarea id="stopText" placeholder="明天先停止哪个消耗精力或拖慢节奏的动作？"></textarea>
           </div>
         </div>
       </article>
@@ -1172,7 +1168,7 @@
       push: document.getElementById("pushTasks"),
       habit: document.getElementById("habitTasks")
     };
-    const fields = ["planText", "doneText", "blockedText", "lessonText", "tomorrowText"];
+    const fields = ["keepText", "improveText", "startText", "stopText"];
     const dateInput = document.getElementById("dateInput");
     const historyList = document.getElementById("historyList");
     const habitMonthPanel = document.getElementById("habitMonthPanel");
@@ -1405,6 +1401,28 @@
       localStorage.setItem("daily-todo-store-v1", JSON.stringify(store));
     }
 
+    function reviewValue(day, id) {
+      const value = day[id]?.trim();
+      if (value) return value;
+
+      if (id === "keepText") {
+        return day.doneText?.trim() || "";
+      }
+
+      if (id === "improveText") {
+        return [day.blockedText, day.lessonText]
+          .map(text => text?.trim())
+          .filter(Boolean)
+          .join("\n");
+      }
+
+      if (id === "startText") {
+        return day.tomorrowText?.trim() || "";
+      }
+
+      return "";
+    }
+
     function normalizeTask(task) {
       return {
         id: task.id || crypto.randomUUID(),
@@ -1440,11 +1458,10 @@
         must: [],
         push: [],
         habit: latestHabitTemplate(key),
-        planText: "",
-        doneText: "",
-        blockedText: "",
-        lessonText: "",
-        tomorrowText: ""
+        keepText: "",
+        improveText: "",
+        startText: "",
+        stopText: ""
       };
     }
 
@@ -1459,6 +1476,9 @@
       sections.forEach(section => {
         store[key][section] = (store[key][section] || []).map(normalizeTask);
       });
+      fields.forEach(id => {
+        store[key][id] = store[key][id] || "";
+      });
       return store[key];
     }
 
@@ -1468,7 +1488,7 @@
       renderDateLabel();
       sections.forEach(section => renderTasks(section, day[section]));
       fields.forEach(id => {
-        document.getElementById(id).value = day[id] || "";
+        document.getElementById(id).value = reviewValue(day, id);
       });
       renderProgress(day);
       renderCalendar();
@@ -1889,14 +1909,14 @@
         (day[section] || []).some(task => task.text?.trim() || task.detail?.trim() || task.done)
       );
       const habitDone = (day.habit || []).some(task => task.done);
-      const reviewText = fields.some(id => day[id]?.trim());
+      const reviewText = fields.some(id => reviewValue(day, id));
       return plannedTasks || habitDone || reviewText;
     }
 
     function recordPreview(day) {
       const firstTask = [...(day.must || []), ...(day.push || [])]
         .find(task => task.text?.trim())?.text.trim();
-      const firstReview = fields.map(id => day[id]?.trim()).find(Boolean);
+      const firstReview = fields.map(id => reviewValue(day, id)).find(Boolean);
       if (firstTask) return firstTask;
       if (firstReview) return firstReview;
       if ((day.habit || []).some(task => task.done)) return "完成了习惯打卡";
@@ -1927,7 +1947,7 @@
         const month = date.getMonth() + 1;
         const dayNumber = date.getDate();
         const weekday = new Intl.DateTimeFormat("zh-CN", { weekday: "short" }).format(date);
-        const hasReview = fields.some(id => day[id]?.trim());
+        const hasReview = fields.some(id => reviewValue(day, id));
         const item = document.createElement("button");
         item.type = "button";
         item.className = "history-item";
@@ -1970,6 +1990,20 @@
         return lines.join("\n");
       }
       tasks.forEach(task => {
+        const text = task.text.trim() || "未命名";
+        lines.push(`- ${text}`);
+        if (task.detail?.trim()) lines.push(`  - ${task.detail.trim()}`);
+      });
+      return lines.join("\n");
+    }
+
+    function markdownChecklist(title, tasks) {
+      const lines = [`## ${title}`];
+      if (!tasks.length) {
+        lines.push("- 未填写");
+        return lines.join("\n");
+      }
+      tasks.forEach(task => {
         const checked = task.done ? "x" : " ";
         const text = task.text.trim() || "未命名";
         lines.push(`- [${checked}] ${text}`);
@@ -1983,37 +2017,36 @@
       const date = fromDateKey(dateKey);
       const weekday = new Intl.DateTimeFormat("zh-CN", { weekday: "long" }).format(date);
       const tasks = sections.flatMap(section => day[section] || []);
-      const done = tasks.filter(task => task.done).length;
+      const habitTasks = day.habit || [];
+      const habitDone = habitTasks.filter(task => task.done).length;
       const total = tasks.length;
 
       return [
         `# 每日复盘 ${dateKey}`,
         "",
         `- 日期：${dateKey} ${weekday}`,
-        `- 完成进度：${done} / ${total}`,
+        `- 记录事项：${total}`,
+        `- 习惯打卡：${habitDone} / ${habitTasks.length}`,
         "",
         markdownList("必须完成", day.must || []),
         "",
         markdownList("可以推进", day.push || []),
         "",
-        markdownList("习惯打卡", day.habit || []),
+        markdownChecklist("习惯打卡", day.habit || []),
         "",
-        "## AAR 轻量复盘",
+        "## KISS 复盘",
         "",
-        "### 原计划",
-        day.planText?.trim() || "未填写",
+        "### Keep 保持",
+        reviewValue(day, "keepText") || "未填写",
         "",
-        "### 实际结果",
-        day.doneText?.trim() || "未填写",
+        "### Improve 改进",
+        reviewValue(day, "improveText") || "未填写",
         "",
-        "### 差距原因",
-        day.blockedText?.trim() || "未填写",
+        "### Start 开始",
+        reviewValue(day, "startText") || "未填写",
         "",
-        "### 学到什么",
-        day.lessonText?.trim() || "未填写",
-        "",
-        "### 明日实验",
-        day.tomorrowText?.trim() || "未填写",
+        "### Stop 停止",
+        reviewValue(day, "stopText") || "未填写",
         ""
       ].join("\n");
     }
